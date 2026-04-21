@@ -20,6 +20,144 @@ Install with:
 pip install "git+https://github.com/mohamedtareq24/pyuvm-asyncio-HIL@asyncio-hil"
 ```
 
+## Installation
+
+### For standalone projects
+
+```bash
+pip install "git+https://github.com/mohamedtareq24/pyuvm-asyncio-HIL@asyncio-hil"
+pip install "pyserial-asyncio>=0.6"
+```
+
+Add this to `requirements.txt` (or your equivalent dependency file):
+
+```txt
+git+https://github.com/mohamedtareq24/pyuvm-asyncio-HIL@asyncio-hil
+pyserial-asyncio>=0.6
+```
+
+### Verify the installed pyuvm source (tutorial)
+
+Use `hil_fork_test/verify_pyuvm_fork.py` to confirm your environment is using
+the HIL fork and not a different pyuvm source.
+
+From the repository root:
+
+```bash
+python hil_fork_test/verify_pyuvm_fork.py
+```
+
+Expected success line:
+
+```text
+PASS: pyuvm installed from pyuvm-asyncio-HIL fork
+```
+
+Optional: override the expected repository (advanced)
+
+```bash
+$env:EXPECTED_PYUVM_REPO = "mohamedtareq24/pyuvm-asyncio-HIL"
+python hil_fork_test/verify_pyuvm_fork.py
+```
+
+For bash:
+
+```bash
+EXPECTED_PYUVM_REPO="mohamedtareq24/pyuvm-asyncio-HIL" python hil_fork_test/verify_pyuvm_fork.py
+```
+
+### Transport example for FTDI loopback and HIL
+
+The verification script above checks installation source metadata only. It does
+not touch hardware. For UART hardware tests (including FTDI loopback), use the
+transport class in `hil_fork_test/hil_serial_transport.py`.
+
+This class provides the methods expected by driver/monitor code:
+
+- `open(port, baud_rate)`
+- `write_packet(packet_16b)`
+- `read_rx_byte()`
+- `close()`
+
+Minimal usage:
+
+```python
+import asyncio
+
+from hil_fork_test.hil_serial_transport import HilSerialTransport
+
+
+async def main() -> None:
+    tr = HilSerialTransport()
+    await tr.open(port="COM5", baud_rate=115200)
+    try:
+        await tr.write_packet(0x1234)
+        rx = await asyncio.wait_for(tr.read_rx_byte(), timeout=1.0)
+        print(f"RX byte: 0x{rx:02X}")
+    finally:
+        await tr.close()
+
+
+asyncio.run(main())
+```
+
+If TX and RX are looped back correctly on the FTDI adapter, the read path
+should return bytes you transmitted.
+
+### Single-agent UART loopback example
+
+For a complete pyuvm HIL testbench with one UART TX agent sending on COM,
+an RX monitor collecting looped-back data, and a scoreboard checking matches, see:
+
+`examples/UARTLoopback_HIL/README.md`
+
+### Loopback hardware check (example)
+
+Use this as a quick physical-port sanity check with FTDI TX/RX loopback:
+
+```bash
+python examples/UARTLoopback_HIL/run_hil.py --port COM3 --baud 115200 --count 4 --test UARTLoopbackSmokeTest
+```
+
+Expected output pattern:
+
+```text
+[TEST CONFIG] UARTLoopbackSmokeTest port=COM3 baud=115200 count_per_agent=4 expected_packets=4
+[uvm_test_top.env.scoreboard]: Match [0]: 0xA110
+[uvm_test_top.env.scoreboard]: Match [1]: 0xA111
+[uvm_test_top.env.scoreboard]: Match [2]: 0xA112
+[uvm_test_top.env.scoreboard]: Match [3]: 0xA113
+```
+
+Pass criteria:
+
+- All scoreboard lines show `Match`
+- Process exits with code `0`
+
+Common failures:
+
+- Wrong `--port` value
+- FTDI TX/RX loopback wiring missing
+- Port already open in another tool
+
+Quick smoke run (validated):
+
+```bash
+python examples/UARTLoopback_HIL/run_hil.py --port COM3 --baud 115200 --count 4 --test UARTLoopbackSmokeTest
+```
+
+Expected behavior:
+
+```text
+[TEST CONFIG] UARTLoopbackSmokeTest port=COM3 baud=115200 count_per_agent=4 expected_packets=4
+[uvm_test_top.env.scoreboard]: Match [0]: 0xA110
+...
+[uvm_test_top.env.scoreboard]: Match [3]: 0xA113
+```
+
+If your FTDI loopback is wired correctly, all packet compares should report as
+`Match` and the process should exit with code `0`.
+
 ---
 
 ## Patched Files
