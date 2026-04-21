@@ -7,7 +7,7 @@
 # SystemVerilog features.
 
 
-from cocotb.triggers import Event as CocotbEvent
+from asyncio import Event as CocotbEvent
 
 from pyuvm.error_classes import *
 from pyuvm.s05_base_classes import *

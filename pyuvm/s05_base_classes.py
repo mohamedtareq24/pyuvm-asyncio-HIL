@@ -2,7 +2,9 @@
 This file defines the UVM base classes
 """
 
-from cocotb.utils import get_sim_time
+# HIL patch: no simulator; return a constant time of 0.
+def get_sim_time(*args, **kwargs):
+    return 0
 
 from pyuvm import error_classes, utility_classes
 from pyuvm.s08_factory_classes import uvm_factory

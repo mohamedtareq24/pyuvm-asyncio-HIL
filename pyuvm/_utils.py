@@ -1,9 +1,2 @@
-import cocotb
-
-_cocotb_version_info = []
-for xx in cocotb.__version__.split("."):
-    try:
-        _cocotb_version_info.append(int(xx))  # for strings like 'dev0'
-    except ValueError:
-        pass
-cocotb_version_info = tuple(_cocotb_version_info)
+# HIL patch: no cocotb simulator available; expose a stable version tuple.
+cocotb_version_info = (2, 0, 0)

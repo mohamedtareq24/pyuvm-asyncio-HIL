@@ -1,4 +1,4 @@
-import cocotb
+import asyncio
 
 from pyuvm import error_classes
 from pyuvm.s05_base_classes import uvm_object
@@ -103,7 +103,7 @@ class uvm_threaded_execute_phase(uvm_phase):
             raise error_classes.UVMBadPhase(
                 f"{comp.get_name()} is missing {method_name} function"
             )
-        cocotb.start_soon(method())
+        asyncio.get_event_loop().create_task(method())
 
 
 # 9.8 Predefined Phases

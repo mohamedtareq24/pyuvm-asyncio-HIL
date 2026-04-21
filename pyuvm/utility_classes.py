@@ -2,22 +2,15 @@ import fnmatch
 import logging
 from collections import OrderedDict
 
-import cocotb.queue
-from cocotb.queue import QueueEmpty
-from cocotb.triggers import Event, NullTrigger
+import asyncio
+from asyncio import Event
+from asyncio.queues import QueueEmpty
+from asyncio import current_task
 
 FIFO_DEBUG = 5
 PYUVM_DEBUG = 4
 logging.addLevelName(FIFO_DEBUG, "FIFO_DEBUG")
 logging.addLevelName(PYUVM_DEBUG, "PYUVM_DEBUG")
-
-
-if int(cocotb.__version__.split(".")[0]) >= 2:
-    from cocotb.task import current_task
-else:
-
-    def current_task():
-        return cocotb.scheduler._current_task
 
 
 def count_bits(nn):
@@ -266,14 +259,14 @@ class ObjectionHandler(metaclass=Singleton):
 
     async def run_phase_complete(self):
         # Allow the run_phase coros to get scheduled and raise objections:
-        await NullTrigger()
+        await asyncio.sleep(0)
         if self.objection_raised:
             await self._objection_event.wait()
         else:
             logging.warning("You did not call self.raise_objection() in any run_phase")
 
 
-class UVMQueue(cocotb.queue.Queue):
+class UVMQueue(asyncio.Queue):
     """
     The UVMQueue provides a peek function as well as the
     ability to break out of a blocking operation if
@@ -282,6 +275,30 @@ class UVMQueue(cocotb.queue.Queue):
     by default.
     """
 
+    def __init__(self, maxsize=0):
+        super().__init__(maxsize)
+        self._item_available = asyncio.Event()
+
+    async def put(self, item):
+        await super().put(item)
+        self._item_available.set()
+
+    def put_nowait(self, item):
+        super().put_nowait(item)
+        self._item_available.set()
+
+    async def get(self):
+        item = await super().get()
+        if self.empty():
+            self._item_available.clear()
+        return item
+
+    def get_nowait(self):
+        item = super().get_nowait()
+        if self.empty():
+            self._item_available.clear()
+        return item
+
     def __str__(self):
         return str(self._queue)
 
@@ -289,21 +306,14 @@ class UVMQueue(cocotb.queue.Queue):
         return self._queue[0]
 
     async def peek(self):
-        """Remove and return an item from the queue.
-        If the queue is empty, wait until an item is available.
-        """
+        """Return the next item without removing it; wait if the queue is empty."""
         while self.empty():
-            event = Event()
-            self._getters.append((event, current_task()))
-            await event.wait()
+            self._item_available.clear()
+            await self._item_available.wait()
         return self.peek_nowait()
 
     def peek_nowait(self):
-        """Remove and return an item from the queue.
-        Return an item if one is immediately available, else raise
-        :exc:`asyncio.QueueEmpty`.
-        """
+        """Return next item without removing it, or raise QueueEmpty."""
         if self.empty():
             raise QueueEmpty()
-        item = self._peek()
-        return item
+        return self._peek()

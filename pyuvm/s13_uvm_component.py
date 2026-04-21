@@ -8,18 +8,13 @@ from pyuvm.s06_reporting_classes import uvm_report_object
 from pyuvm.s08_factory_classes import uvm_factory
 from pyuvm.s09_phasing import uvm_build_phase, uvm_common_phases, uvm_run_phase
 
-if cocotb_version_info < (2, 0):
-    from cocotb.log import SimColourLogFormatter, SimLogFormatter, SimTimeContextFilter
-    from cocotb.utils import want_color_output
+# HIL patch: use plain Python logging
+LogFormatter = logging.Formatter
 
-    if want_color_output():
-        LogFormatter = SimColourLogFormatter
-    else:
-        LogFormatter = SimLogFormatter
-else:
-    from cocotb.logging import SimLogFormatter, SimTimeContextFilter
 
-    LogFormatter = SimLogFormatter
+class SimTimeContextFilter(logging.Filter):
+    """No-op filter; replaces cocotb's SimTimeContextFilter."""
+    pass
 
 
 # 13.1.1
